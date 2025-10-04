@@ -53,7 +53,9 @@ namespace WCF_POCs.Logging
         private static readonly IConfigurationProvider Config = new DefaultConfigurationProvider();
 
         private static readonly bool LoggingEnabled = Config.GetBoolValue("EnableWcfMessageLogging", true);
-        private static readonly string LoggingPath = Config.GetStringValue("WcfMessageLoggingPath", Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "WcfLogs", "SoapLogs"));
+        //Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData) points to "C:\ProgramData" kind of folders
+        //AppContext.BaseDirectory points to the folder where the app is running from like "C:\inetpub\wwwroot\MyApp" or where its running from in dev
+        private static readonly string LoggingPath = Config.GetStringValue("WcfMessageLoggingPath", Path.Combine(AppContext.BaseDirectory, "WCFLogs"));
         private static readonly int MaxMessageSize = Config.GetIntValue("WcfMessageLoggingMaxSize", 5242880);
         private static readonly bool RawXmlConsoleLogging = Config.GetBoolValue("RawXmlConsoleLogging", false);
         private static readonly bool SoapXmlConsoleLogging = Config.GetBoolValue("SoapXmlConsoleLogging", false);
@@ -424,7 +426,7 @@ Endpoint: {endpointUrl}
 
                 try
                 {
-                    string fallbackPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "SoapLogs");
+                    string fallbackPath = Path.Combine(AppContext.BaseDirectory, "WCFLogs");
                     if (LoggingPath != fallbackPath && !Directory.Exists(fallbackPath))
                     {
                         Directory.CreateDirectory(fallbackPath);

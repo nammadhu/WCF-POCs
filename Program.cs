@@ -23,7 +23,6 @@ if (IsLocalhostEnvironment())
 
     builder.Services.AddSingleton<IServiceBehavior, WcfMessageLoggingExtension>();
 }
-builder.Services.AddSingleton<IServiceBehavior, WcfMessageLoggingExtension>();
 
 
 var app = builder.Build();

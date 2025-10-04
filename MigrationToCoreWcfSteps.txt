@@ -1,5 +1,13 @@
-refer https://github.com/CoreWCF/CoreWCF
+On Runnning it opens up in browser with url of https://localhost:7012/ and shows "This localhost page can’t be found"
+Append your service name as like https://localhost:7012/Service1.svc then it shows the page.
+Its wsdl will be https://localhost:7012/Service1.svc?wsdl
 
+On SoapUI , File=>New SOAP Project => Initial WSDL = https://localhost:7012/Service1.svc?wsdl => OK
+Then it shows the methods defined in the service.
+In tool requests pass parameter as 1 or bool as true , stringvalue as madhu then it works perfectly
+
+For migrating .net framework to .net Core refer https://github.com/CoreWCF/CoreWCF
+Instruction followed only for creating a basic WCF service in .net core
 on terminal 
 >dotnet new install CoreWCF.Templates
 >dotnet new corewcf --name WCF_POCs
