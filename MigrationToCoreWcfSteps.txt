@@ -1,0 +1,6 @@
+refer https://github.com/CoreWCF/CoreWCF
+
+on terminal 
+>dotnet new install CoreWCF.Templates
+>dotnet new corewcf --name WCF_POCs
+
