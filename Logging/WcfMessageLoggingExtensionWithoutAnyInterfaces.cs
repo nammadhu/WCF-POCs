@@ -1,63 +1,39 @@
+//-----------------------------------------------------------------------------------------
+// WCF Message Logging Extension - Open Source Component
+// A CoreWCF message inspector that logs incoming and outgoing SOAP messages.
+// Used for capturing WCF service requests and responses for SOAPUI testing.
+//-----------------------------------------------------------------------------------------
+using CoreWCF;
+using CoreWCF.Channels;
+using CoreWCF.Description;
 using CoreWCF.Dispatcher;
+using System;
 using System.Collections.ObjectModel;
+using System.Configuration;
 using System.Diagnostics;
+using System.IO;
+using System.Linq;
 using System.Text;
 using System.Xml;
 using System.Xml.Linq;
 
 namespace WCF_POCs.Logging;
+
 /// <summary>
 /// If no need of any custom logger then this WcfMessageLoggingExtensionWithoutAnyInterfaces can be used directly.
 /// If need to use any custom logger then implement ICustomLogger interface and use WcfMessageLoggingExtension class.
 /// </summary>
-
-public interface IWcfLogger
-{
-    void LogError(string message, Exception ex = null);
-    void LogWarning(string message);
-    void LogInfo(string message);
-    void LogDebug(string message);
-}
-
-public interface IConfigurationProvider
-{
-    string GetStringValue(string key, string defaultValue = null);
-    bool GetBoolValue(string key, bool defaultValue = false);
-    int GetIntValue(string key, int defaultValue = 0);
-}
-
-public static class WcfLoggerFactory
-{
-    private static IWcfLogger logger;
-
-    public static void SetLogger(IWcfLogger wcfLogger)
-    {
-        logger = wcfLogger;
-    }
-
-    public static IWcfLogger CreateLogger()
-    {
-        return logger ?? new DefaultConsoleLogger();
-    }
-}
-
-public class WcfMessageLoggingExtension : IDispatchMessageInspector, IServiceBehavior
+public class WcfMessageLoggingExtensionWithoutAnyInterfaces : IDispatchMessageInspector, IServiceBehavior
 {
     private const string UrlDefaultInCaseOfExtractionFailed = "http://localhost/Service";
 
-    private static readonly IWcfLogger Logger = WcfLoggerFactory.CreateLogger();
-    private static readonly IConfigurationProvider Config = new DefaultConfigurationProvider();
-
-    private static readonly bool LoggingEnabled = Config.GetBoolValue("EnableWcfMessageLogging", true);
-    //Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData) points to "C:\ProgramData" kind of folders
-    //AppContext.BaseDirectory points to the folder where the app is running from like "C:\inetpub\wwwroot\MyApp" or where its running from in dev
-    // or like ""C:\\Users\\nammadhu\\source\\repos\\WCF_POCs\\bin\\Debug\\net8.0\\WCFLogs""
-    private static readonly string LoggingPath = Config.GetStringValue("WcfMessageLoggingPath", Path.Combine(AppContext.BaseDirectory, "WCFLogs", DateTime.Today.ToString("ddMMMyyyy")));
-    private static readonly int MaxMessageSize = Config.GetIntValue("WcfMessageLoggingMaxSize", 5242880);
-    private static readonly bool RawXmlConsoleLogging = Config.GetBoolValue("RawXmlConsoleLogging", false);
-    private static readonly bool SoapXmlConsoleLogging = Config.GetBoolValue("SoapXmlConsoleLogging", false);
-    private static readonly bool RawXmlFileLogging = Config.GetBoolValue("RawXmlFileLogging", false);
-    private static readonly bool SoapXmlFileLogging = Config.GetBoolValue("SoapXmlFileLogging", true);
+    private static readonly bool LoggingEnabled = GetConfigurationBool("EnableWcfMessageLogging", true);
+    private static readonly string LoggingPath = GetConfigurationString("WcfMessageLoggingPath", Path.Combine(AppContext.BaseDirectory, "WCFLogs", DateTime.Today.ToString("ddMMMyyyy")));
+    private static readonly int MaxMessageSize = GetConfigurationInt("WcfMessageLoggingMaxSize", 5242880);
+    private static readonly bool RawXmlConsoleLogging = GetConfigurationBool("RawXmlConsoleLogging", false);
+    private static readonly bool SoapXmlConsoleLogging = GetConfigurationBool("SoapXmlConsoleLogging", false);
+    private static readonly bool RawXmlFileLogging = GetConfigurationBool("RawXmlFileLogging", false);
+    private static readonly bool SoapXmlFileLogging = GetConfigurationBool("SoapXmlFileLogging", true);
 
     public object AfterReceiveRequest(ref Message request, IClientChannel channel, InstanceContext instanceContext)
     {
@@ -91,7 +67,7 @@ public class WcfMessageLoggingExtension : IDispatchMessageInspector, IServiceBeh
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error logging WCF request: {ex.Message}", ex);
+            LogError($"Error logging WCF request: {ex.Message}", ex);
             return null;
         }
     }
@@ -105,7 +81,7 @@ public class WcfMessageLoggingExtension : IDispatchMessageInspector, IServiceBeh
 
         try
         {
-            if (!(correlationState is MessageLoggingCorrelationState state))
+            if (correlationState is not MessageLoggingCorrelationState state)
             {
                 return;
             }
@@ -114,42 +90,42 @@ public class WcfMessageLoggingExtension : IDispatchMessageInspector, IServiceBeh
             Message replyCopy = buffer.CreateMessage();
 
             string rawXml = GetMessageContentSafely(replyCopy);
-            
+
             ProcessMessageLogging(rawXml, state.OperationName, state.CorrelationId, state.EndpointUrl, "Response", false);
 
             TimeSpan elapsed = DateTime.UtcNow - state.Timestamp;
-            Logger.LogDebug($"WCF operation {state.OperationName} completed in {elapsed.TotalMilliseconds}ms");
+            LogDebug($"WCF operation {state.OperationName} completed in {elapsed.TotalMilliseconds}ms");
 
             reply = buffer.CreateMessage();
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error logging WCF response: {ex.Message}", ex);
+            LogError($"Error logging WCF response: {ex.Message}", ex);
         }
     }
 
-    public void AddBindingParameters(ServiceDescription serviceDescription, ServiceHostBase serviceHostBase, 
+    public void AddBindingParameters(ServiceDescription serviceDescription, ServiceHostBase serviceHostBase,
         Collection<ServiceEndpoint> endpoints, BindingParameterCollection bindingParameters)
     {
     }
 
     public void ApplyDispatchBehavior(ServiceDescription serviceDescription, ServiceHostBase serviceHostBase)
     {
-        try 
+        try
         {
             if (serviceHostBase?.ChannelDispatchers == null)
             {
-                Logger.LogWarning("Cannot apply WCF logging - serviceHostBase or ChannelDispatchers is null");
+                LogWarning("Cannot apply WCF logging - serviceHostBase or ChannelDispatchers is null");
                 return;
             }
 
-            Logger.LogInfo($"WCF Logging: Adding message inspector to {serviceHostBase.ChannelDispatchers.Count} dispatchers");
+            LogInfo($"WCF Logging: Adding message inspector to {serviceHostBase.ChannelDispatchers.Count} dispatchers");
             foreach (ChannelDispatcher channelDispatcher in serviceHostBase.ChannelDispatchers)
             {
                 foreach (EndpointDispatcher endpointDispatcher in channelDispatcher.Endpoints)
                 {
                     endpointDispatcher.DispatchRuntime.MessageInspectors.Add(this);
-                    Logger.LogInfo($"Added WCF logging inspector to endpoint: {endpointDispatcher.EndpointAddress}");
+                    LogInfo($"Added WCF logging inspector to endpoint: {endpointDispatcher.EndpointAddress}");
                 }
             }
 
@@ -157,7 +133,7 @@ public class WcfMessageLoggingExtension : IDispatchMessageInspector, IServiceBeh
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error applying WCF message inspector: {ex.Message}", ex);
+            LogError($"Error applying WCF message inspector: {ex.Message}", ex);
         }
     }
 
@@ -182,12 +158,12 @@ public class WcfMessageLoggingExtension : IDispatchMessageInspector, IServiceBeh
     {
         if (RawXmlFileLogging)
         {
-            WriteToLogFile(rawXml, operationName, correlationId, $"raw{messageType}");
+            WriteToLogFile(rawXml, operationName, correlationId, $"raw{messageType}.RAW");
         }
 
         if (SoapXmlFileLogging)
         {
-            WriteToLogFile(soapXml, operationName, correlationId, $"{messageType.ToLower()}.soapui");
+            WriteToLogFile(soapXml, operationName, correlationId, $"{messageType.ToLower()}");
         }
     }
 
@@ -203,7 +179,7 @@ public class WcfMessageLoggingExtension : IDispatchMessageInspector, IServiceBeh
         Console.WriteLine($"\n========== WCF {messageType.ToUpper()} ==========");
         Console.WriteLine($"Operation: {operationName}");
         Console.WriteLine($"Correlation ID: {correlationId}");
-        
+
         if (isRequest)
         {
             Console.WriteLine($"Timestamp: {DateTime.Now}");
@@ -355,7 +331,7 @@ public class WcfMessageLoggingExtension : IDispatchMessageInspector, IServiceBeh
 
             string result = sb.ToString();
             string commentType = isRequest ? "Request" : "Response";
-            string comment = isRequest 
+            string comment = isRequest
                 ? $"<!-- SOAPUI Compatible {commentType} for {operationName}\r\nEndpoint: {endpointUrl}\r\n-->\r\n"
                 : $"<!-- SOAPUI Compatible {commentType} for {operationName} -->\r\n";
 
@@ -389,16 +365,14 @@ Endpoint: {endpointUrl}
         {
             EnsureLogDirectoryExists();
 
-            //var fileName = Path.Combine(LoggingPath, $"{operationName}_{type}_{DateTime.UtcNow:yyyyMMdd_HHmmss}_{correlationId}.xml");
             var fileName = Path.Combine(LoggingPath, $"{operationName}_{type}_{DateTime.Now:HHmmss}_{correlationId.Substring(0, 5)}....xml");
-            //DateTime.UtcNow prints in UTS, but DateTime.Now prints in running user machine timezone
 
             File.WriteAllText(fileName, content, Encoding.UTF8);
-            Logger.LogInfo($"WCF message logged to {fileName}");
+            LogInfo($"WCF message logged to {fileName}");
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Failed to write WCF log to file: {ex.Message}", ex);
+            LogError($"Failed to write WCF log to file: {ex.Message}", ex);
         }
     }
 
@@ -409,7 +383,7 @@ Endpoint: {endpointUrl}
             if (!Directory.Exists(LoggingPath))
             {
                 Directory.CreateDirectory(LoggingPath);
-                Logger.LogInfo($"Created WCF log directory: {LoggingPath}");
+                LogInfo($"Created WCF log directory: {LoggingPath}");
 
                 if (RawXmlConsoleLogging || SoapXmlConsoleLogging)
                 {
@@ -421,7 +395,7 @@ Endpoint: {endpointUrl}
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Failed to create log directory {LoggingPath}: {ex.Message}", ex);
+            LogError($"Failed to create log directory {LoggingPath}: {ex.Message}", ex);
 
             try
             {
@@ -429,7 +403,7 @@ Endpoint: {endpointUrl}
                 if (LoggingPath != fallbackPath && !Directory.Exists(fallbackPath))
                 {
                     Directory.CreateDirectory(fallbackPath);
-                    Logger.LogInfo($"Created fallback WCF log directory: {fallbackPath}");
+                    LogInfo($"Created fallback WCF log directory: {fallbackPath}");
                 }
             }
             catch
@@ -438,74 +412,48 @@ Endpoint: {endpointUrl}
         }
     }
 
-    private class MessageLoggingCorrelationState
+    private static void LogError(string message, Exception ex = null)
     {
-        public string CorrelationId { get; set; }
-
-        public string OperationName { get; set; }
-
-        public DateTime Timestamp { get; set; }
-
-        public string MessageContent { get; set; }
-
-        public string EndpointUrl { get; set; }
-    }
-}
-
-internal class DefaultConsoleLogger : IWcfLogger
-{
-    public void LogError(string message, Exception ex = null)
-    {
-        Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine($"[ERROR] {DateTime.Now:yyyy-MM-dd HH:mm:ss} - {message}");
+        WriteColoredLog("ERROR", ConsoleColor.Red, message);
         if (ex != null)
         {
             Console.WriteLine($"Exception: {ex}");
         }
+    }
 
+    private static void LogWarning(string message)
+    => WriteColoredLog("WARN", ConsoleColor.Yellow, message);
+
+    private static void LogInfo(string message)
+    => WriteColoredLog("INFO", ConsoleColor.Cyan, message);
+
+    private static void LogDebug(string message)
+    => WriteColoredLog("DEBUG", ConsoleColor.Gray, message);
+
+    private static void WriteColoredLog(string level, ConsoleColor color, string message)
+    {
+        Console.ForegroundColor = color;
+        Console.WriteLine($"[{level}] {DateTime.Now:yyyy-MM-dd HH:mm:ss} - {message}");
         Console.ResetColor();
     }
 
-    public void LogWarning(string message)
-    {
-        Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine($"[WARN] {DateTime.Now:yyyy-MM-dd HH:mm:ss} - {message}");
-        Console.ResetColor();
-    }
-
-    public void LogInfo(string message)
-    {
-        Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine($"[INFO] {DateTime.Now:yyyy-MM-dd HH:mm:ss} - {message}");
-        Console.ResetColor();
-    }
-
-    public void LogDebug(string message)
-    {
-        Console.ForegroundColor = ConsoleColor.Gray;
-        Console.WriteLine($"[DEBUG] {DateTime.Now:yyyy-MM-dd HH:mm:ss} - {message}");
-        Console.ResetColor();
-    }
-}
-
-internal class DefaultConfigurationProvider : IConfigurationProvider
-{
-    public string GetStringValue(string key, string defaultValue = null)
-    {
-        return Environment.GetEnvironmentVariable(key) ??
+    private static string GetConfigurationString(string key, string defaultValue = null)
+    => Environment.GetEnvironmentVariable(key) ??
                System.Configuration.ConfigurationManager.AppSettings[key] ??
                defaultValue;
-    }
 
-    public bool GetBoolValue(string key, bool defaultValue = false)
-    {
-        var value = GetStringValue(key);
-        return bool.TryParse(value, out var result) ? result : defaultValue;
-    }
+    private static bool GetConfigurationBool(string key, bool defaultValue = false)
+    => bool.TryParse(GetConfigurationString(key), out var result) ? result : defaultValue;
 
-    public int GetIntValue(string key, int defaultValue = 0)
+    private static int GetConfigurationInt(string key, int defaultValue = 0)
+    => int.TryParse(GetConfigurationString(key), out var result) ? result : defaultValue;
+
+    private class MessageLoggingCorrelationState
     {
-        var value = GetStringValue(key);
-        return int.TryParse(value, out var result) ? result : defaultValue;
+        public string CorrelationId { get; set; }
+        public string OperationName { get; set; }
+        public DateTime Timestamp { get; set; }
+        public string MessageContent { get; set; }
+        public string EndpointUrl { get; set; }
     }
 }
