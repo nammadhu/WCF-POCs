@@ -1,14 +1,6 @@
-using CoreWCF;
-using CoreWCF.Channels;
-using CoreWCF.Description;
 using CoreWCF.Dispatcher;
-using System;
 using System.Collections.ObjectModel;
-using System.Configuration;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
-using System.ServiceModel;
 using System.Text;
 using System.Xml;
 using System.Xml.Linq;
@@ -55,7 +47,8 @@ namespace WCF_POCs.Logging
         private static readonly bool LoggingEnabled = Config.GetBoolValue("EnableWcfMessageLogging", true);
         //Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData) points to "C:\ProgramData" kind of folders
         //AppContext.BaseDirectory points to the folder where the app is running from like "C:\inetpub\wwwroot\MyApp" or where its running from in dev
-        private static readonly string LoggingPath = Config.GetStringValue("WcfMessageLoggingPath", Path.Combine(AppContext.BaseDirectory, "WCFLogs"));
+        // or like ""C:\\Users\\nammadhu\\source\\repos\\WCF_POCs\\bin\\Debug\\net8.0\\WCFLogs""
+        private static readonly string LoggingPath = Config.GetStringValue("WcfMessageLoggingPath", Path.Combine(AppContext.BaseDirectory, "WCFLogs", DateTime.Today.ToString("ddMMMyyyy")));
         private static readonly int MaxMessageSize = Config.GetIntValue("WcfMessageLoggingMaxSize", 5242880);
         private static readonly bool RawXmlConsoleLogging = Config.GetBoolValue("RawXmlConsoleLogging", false);
         private static readonly bool SoapXmlConsoleLogging = Config.GetBoolValue("SoapXmlConsoleLogging", false);
@@ -392,7 +385,9 @@ Endpoint: {endpointUrl}
             {
                 EnsureLogDirectoryExists();
 
-                var fileName = Path.Combine(LoggingPath, $"{operationName}_{type}_{DateTime.UtcNow:yyyyMMdd_HHmmss}_{correlationId}.xml");
+                //var fileName = Path.Combine(LoggingPath, $"{operationName}_{type}_{DateTime.UtcNow:yyyyMMdd_HHmmss}_{correlationId}.xml");
+                var fileName = Path.Combine(LoggingPath, $"{operationName}_{type}_{DateTime.Now:HHmmss}_{correlationId.Substring(0, 5)}....xml");
+                //DateTime.UtcNow prints in UTS, but DateTime.Now prints in running user machine timezone
 
                 File.WriteAllText(fileName, content, Encoding.UTF8);
                 Logger.LogInfo($"WCF message logged to {fileName}");

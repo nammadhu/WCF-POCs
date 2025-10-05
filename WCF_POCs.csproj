@@ -14,15 +14,8 @@
     <Using Include="Microsoft.Extensions.DependencyInjection.Extensions" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="CoreWCF.Primitives" Version="1.*" />
+    <PackageReference Include="CoreWCF.Primitives" Version="1.8.0" />
     <PackageReference Include="CoreWCF.Http" Version="1.*" />
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="8.0.0" />
-  </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Screenshots\browser-access\" />
-    <Folder Include="Screenshots\logging-output\" />
-    <Folder Include="Screenshots\service-running\" />
-    <Folder Include="Screenshots\soapui-setup\" />
-    <Folder Include="Screenshots\testing-examples\" />
   </ItemGroup>
 </Project>
